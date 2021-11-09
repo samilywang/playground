@@ -8,7 +8,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "mocha"
+    "test": "tsc && promises-aplus-tests compiled/index.js"
   },
   "keywords": [],
   "author": "SamilyWang",

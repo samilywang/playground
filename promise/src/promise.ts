@@ -15,8 +15,8 @@ export class MyPromise implements Thenable {
   private state: MyPromiseState;
   private value: unknown;
   private reason: unknown;
-  private onFulfilledCallbacks: ResolveFunction[];
-  private onRejectedCallbacks: RejectFunction[];
+  private onFulfilledCallbacks: ResolveFunction[] = [];
+  private onRejectedCallbacks: RejectFunction[] = [];
 
   constructor(executor: (resolve: ResolveFunction, reject: RejectFunction) => void) {
     this.state = MyPromiseState.pending;
@@ -46,29 +46,33 @@ export class MyPromise implements Thenable {
   then(onFulfilled?: ResolveFunction, onRejected?: RejectFunction): MyPromise {
     const nextPromise = new MyPromise((resolve, reject) => {
       const onResolve = () => {
-        if (typeof onFulfilled === 'function') {
-          try {
-            const x = onFulfilled(this.value);
-            this.resolvePromise(nextPromise, x, resolve, reject);
-          } catch (e) {
-            reject(e);
+        setTimeout(() => {
+          if (typeof onFulfilled === 'function') {
+            try {
+              const x = onFulfilled(this.value);
+              this.resolvePromise(nextPromise, x, resolve, reject);
+            } catch (e) {
+              reject(e);
+            }
+          } else {
+            resolve(this.value);
           }
-        } else {
-          resolve(this.value);
-        }
+        });
       };
 
       const onReject = () => {
-        if (typeof onRejected === 'function') {
-          try {
-            const x = onRejected(this.reason);
-            this.resolvePromise(nextPromise, x, resolve, reject);
-          } catch (e) {
-            reject(e);
+        setTimeout(() => {
+          if (typeof onRejected === 'function') {
+            try {
+              const x = onRejected(this.reason);
+              this.resolvePromise(nextPromise, x, resolve, reject);
+            } catch (e) {
+              reject(e);
+            }
+          } else {
+            reject(this.reason);
           }
-        } else {
-          reject(this.reason);
-        }
+        });
       };
 
       switch (this.state) {
@@ -80,7 +84,7 @@ export class MyPromise implements Thenable {
           break;
         case MyPromiseState.pending:
           this.onFulfilledCallbacks.push(onResolve);
-          this.onFulfilledCallbacks.push(onReject);
+          this.onRejectedCallbacks.push(onReject);
           break;
       }
     });
@@ -95,40 +99,41 @@ export class MyPromise implements Thenable {
     nextPromiseReject: RejectFunction
   ) {
     if (nextPromise === x) {
-      nextPromiseReject(TypeError);
+      nextPromiseReject(new TypeError('Promise and x cannot refer to the same object'));
       return;
     }
 
-    if (x instanceof MyPromise) {
-      switch (x.state) {
-        case MyPromiseState.fulfilled:
-          nextPromiseResolve(x.value);
-          break;
-        case MyPromiseState.rejected:
-          nextPromiseReject(x.reason);
-          break;
-        case MyPromiseState.pending:
-          x.onFulfilledCallbacks.push(() => {
-            nextPromiseResolve(x.value);
-          });
-          x.onRejectedCallbacks.push(() => {
-            nextPromiseReject(x.reason);
-          });
-          break;
-      }
+    // why this part is wrong
+    // if (x instanceof MyPromise) {
+    //   switch (x.state) {
+    //     case MyPromiseState.fulfilled:
+    //       nextPromiseResolve(x.value);
+    //       break;
+    //     case MyPromiseState.rejected:
+    //       nextPromiseReject(x.reason);
+    //       break;
+    //     case MyPromiseState.pending:
+    //       x.onFulfilledCallbacks.push(() => {
+    //         nextPromiseResolve(x.value);
+    //       });
+    //       x.onRejectedCallbacks.push(() => {
+    //         nextPromiseReject(x.reason);
+    //       });
+    //       break;
+    //   }
 
-      return;
-    }
+    //   return;
+    // }
 
-    if (typeof x === 'object' || typeof x === 'function') {
+    if (x !== null && (typeof x === 'object' || typeof x === 'function')) {
+      let called = false;
       try {
         const then = (x as Thenable).then;
 
         if (typeof then === 'function') {
-          let called = false;
           then.call(
             x,
-            y => {
+            (y: unknown) => {
               if (called) {
                 return;
               }
@@ -136,7 +141,7 @@ export class MyPromise implements Thenable {
               called = true;
               this.resolvePromise(nextPromise, y, nextPromiseResolve, nextPromiseReject);
             },
-            r => {
+            (r: unknown) => {
               if (called) {
                 return;
               }
@@ -149,6 +154,11 @@ export class MyPromise implements Thenable {
           nextPromiseResolve(x);
         }
       } catch (e) {
+        if (called) {
+          return;
+        }
+
+        called = true;
         nextPromiseReject(e);
       }
     } else {
@@ -156,5 +166,3 @@ export class MyPromise implements Thenable {
     }
   }
 }
-
-new Promise((resolve, reject) => {});
