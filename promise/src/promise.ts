@@ -103,27 +103,26 @@ export class MyPromise implements Thenable {
       return;
     }
 
-    // why this part is wrong
-    // if (x instanceof MyPromise) {
-    //   switch (x.state) {
-    //     case MyPromiseState.fulfilled:
-    //       nextPromiseResolve(x.value);
-    //       break;
-    //     case MyPromiseState.rejected:
-    //       nextPromiseReject(x.reason);
-    //       break;
-    //     case MyPromiseState.pending:
-    //       x.onFulfilledCallbacks.push(() => {
-    //         nextPromiseResolve(x.value);
-    //       });
-    //       x.onRejectedCallbacks.push(() => {
-    //         nextPromiseReject(x.reason);
-    //       });
-    //       break;
-    //   }
+    if (x instanceof MyPromise) {
+      switch (x.state) {
+        case MyPromiseState.fulfilled:
+          this.resolvePromise(nextPromise, x.value, nextPromiseResolve, nextPromiseReject);
+          break;
+        case MyPromiseState.rejected:
+          nextPromiseReject(x.reason);
+          break;
+        case MyPromiseState.pending:
+          x.onFulfilledCallbacks.push(() => {
+            this.resolvePromise(nextPromise, x.value, nextPromiseResolve, nextPromiseReject);
+          });
+          x.onRejectedCallbacks.push(() => {
+            nextPromiseReject(x.reason);
+          });
+          break;
+      }
 
-    //   return;
-    // }
+      return;
+    }
 
     if (x !== null && (typeof x === 'object' || typeof x === 'function')) {
       let called = false;
