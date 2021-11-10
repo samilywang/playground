@@ -92,6 +92,10 @@ export class MyPromise implements Thenable {
     return nextPromise;
   }
 
+  catch(onRejected?: RejectFunction): MyPromise {
+    return this.then(undefined, onRejected);
+  }
+
   private resolvePromise(
     nextPromise: MyPromise,
     x: unknown,
@@ -163,5 +167,43 @@ export class MyPromise implements Thenable {
     } else {
       nextPromiseResolve(x);
     }
+  }
+
+  static resolve<T>(value: T) {
+    return new MyPromise((resolve, reject) => {
+      resolve(value);
+    });
+  }
+
+  static reject<T>(reason: T) {
+    return new MyPromise((resolve, reject) => {
+      reject(reason);
+    });
+  }
+
+  static all(...promises: MyPromise[]) {
+    const count = promises.length;
+    const results: unknown[] = [];
+    let successCount = 0;
+
+    return new MyPromise((resolve, reject) => {
+      promises.forEach((promise, index) => {
+        promise.then(value => {
+          results[index] = value;
+          successCount++;
+          if (successCount === count) {
+            resolve(results);
+          }
+        }, reject);
+      });
+    });
+  }
+
+  static race(...promises: MyPromise[]) {
+    return new MyPromise((resolve, reject) => {
+      promises.forEach(promise => {
+        promise.then(resolve, reject);
+      });
+    });
   }
 }
