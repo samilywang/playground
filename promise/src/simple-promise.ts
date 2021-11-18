@@ -103,6 +103,44 @@ export class SimplePromise implements Thenable {
 
     return nextPromise;
   }
+
+  catch(onRejected?: OnRejectedCallback) {
+    return this.then(undefined, onRejected);
+  }
+
+  static resolve(value: unknown) {
+    return new SimplePromise((resolve, reject) => resolve(value));
+  }
+
+  static reject(reason: unknown) {
+    return new SimplePromise((resolve, reject) => reject(reason));
+  }
+
+  static all(...promises: SimplePromise[]) {
+    const count = promises.length;
+    const results: unknown[] = [];
+    let successCount = 0;
+
+    return new SimplePromise((resolve, reject) => {
+      promises.forEach((promise, index) => {
+        promise.then(value => {
+          results[index] = value;
+          successCount++;
+          if (successCount === count) {
+            resolve(results);
+          }
+        }, reject);
+      });
+    });
+  }
+
+  static race(...promises: SimplePromise[]) {
+    return new SimplePromise((resolve, reject) => {
+      promises.forEach(promise => {
+        promise.then(resolve, reject);
+      });
+    });
+  }
 }
 
 function promiseResolveProcedure(
@@ -119,15 +157,13 @@ function promiseResolveProcedure(
   if (x instanceof SimplePromise) {
     switch (x.state) {
       case SimplePromiseState.pending:
-        x.onFulfilledCallbacks.push(nextPromiseResolve);
-        // x.onFulfilledCallbacks.push(() =>
-        //   promiseResolveProcedure(nextPromise, x.value, nextPromiseResolve, nextPromiseReject)
-        // );
+        x.onFulfilledCallbacks.push(() =>
+          promiseResolveProcedure(nextPromise, x.value, nextPromiseResolve, nextPromiseReject)
+        );
         x.onRejectedCallbacks.push(nextPromiseReject);
         break;
       case SimplePromiseState.fulfilled:
-        nextPromiseResolve(x.value);
-        // promiseResolveProcedure(nextPromise, x.value, nextPromiseResolve, nextPromiseReject);
+        promiseResolveProcedure(nextPromise, x.value, nextPromiseResolve, nextPromiseReject);
         break;
       case SimplePromiseState.rejected:
         nextPromiseReject(x.reason);
@@ -138,7 +174,6 @@ function promiseResolveProcedure(
   }
 
   if (x !== null && (typeof x === 'object' || typeof x === 'function')) {
-    //if (typeof x === 'object' || typeof x === 'function') {
     let called = false;
 
     try {
@@ -151,7 +186,6 @@ function promiseResolveProcedure(
           (y: unknown) => {
             if (!called) {
               called = true;
-              console.log(y);
               promiseResolveProcedure(nextPromise, y, nextPromiseResolve, nextPromiseReject);
             }
           },
